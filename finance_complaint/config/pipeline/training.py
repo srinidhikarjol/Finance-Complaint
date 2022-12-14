@@ -12,6 +12,9 @@ from finance_complaint.entity.metadata_entity import DataIngestionMetaData
 class FinanceConfig:
 
     def __init__(self,timestamp = TIMESTAMP, pipeline_name = PIPELINE_NAME):
+        """
+        Initialize the required values 
+        """
         self.timestamp = timestamp
         self.pipeline_name = pipeline_name
         self.pipeline_config = self.get_pipeline_config()
