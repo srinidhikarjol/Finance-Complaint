@@ -4,9 +4,11 @@ from finance_complaint.exception import FinanceException
 from finance_complaint.config.spark_manager import spark_session
 import os,sys
 import pandas as pd
+from finance_complaint.entity.metadata_entity import DataIngestionMetaData
+from finance_complaint.entity.artifact_entity import DataIngestionArtifact
 #init ->config , n_retries
 #get the required interval - from and to date
-#download data ?
+#download data
 #data to parquet file
 #retry download
 #update metadata
@@ -167,3 +169,56 @@ class DataIngestion:
             return file_path        
         except Exception as e:
             raise FinanceException(e, sys)        
+
+
+    def update_meta_data(self,parquet_data_file_path:str):
+        try:
+            logger.info("Writing meta data info to meta file")
+            metadata_obj = DataIngestionMetaData(metadata_file_path=self.data_ingestion_config.metadata_file_path)
+
+            metadata_obj.write_metadata_info(from_date=self.data_ingestion_config.from_date,
+                 to_date=self.data_ingestion_config.to_date, data_file_path=parquet_data_file_path)
+            logger.info("Meta data file updated.")
+
+        except Exception as e:
+            raise FinanceException(e, sys)            
+
+
+    def initiate_data_ingestion(self) -> DataIngestionArtifact:
+        try:
+            logger.info(f"Started downloading json file")
+            if self.data_ingestion_config.from_date != self.data_ingestion_config.to_date:
+                self.download_files()
+
+            logger.info("Combining all the downloaded files to a parquet file")
+            if  os.path.exists(self.data_ingestion_config.download_dir):
+                file_path = self.convert_files_to_parquet()
+                self.update_meta_data(parquet_data_file_path=file_path)
+
+            feature_store_file_path = os.path.join(self.data_ingestion_config.feature_store_dir,
+                                                   self.data_ingestion_config.file_name)    
+
+            data_ingestion_artifact = DataIngestionArtifact(feature_store_file_path = feature_store_file_path,
+             metadata_file_path = self.data_ingestion_config.metadata_file_path, download_dir=self.data_ingestion_config.download_dir)
+
+            logger.info(f"Data ingestion is complete.")
+            logger.info(f"Data Ingestion Artifact ->{data_ingestion_artifact}")
+
+            return data_ingestion_artifact     
+        except Exception as e:
+            raise FinanceException(e, sys)      
+
+
+def main():
+    config = FinanceConfig()
+    data_ingestion_config = config.get_data_ingestion_config()
+    data_ingestion_obj = DataIngestion(data_ingestion_config=data_ingestion_config)  
+    data_ingestion_artifact = data_ingestion_obj.initiate_data_ingestion()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+
+    except Exception as e:
+        logger.exception(e)
